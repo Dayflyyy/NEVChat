@@ -1,0 +1,50 @@
+# Test your FastAPI endpoints
+
+### 测试call_zhipu
+POST http://localhost:8000/test
+Content-Type: application/json
+Accept: application/json
+
+{
+  "question": "介绍一下特斯拉这个品牌"
+}
+
+
+### 测试brand
+
+POST http://localhost:8000/brand_card
+Content-Type: application/json
+Accept: application/json
+
+{
+  "question": "介绍一下特斯拉这个品牌"
+}
+
+###
+
+POST http://localhost:8000/brand_card_list
+Content-Type: application/json
+Accept: application/json
+
+{
+  "question": "给我推荐一些适合投资的新能源车企"
+}
+
+###
+
+POST http://localhost:8000/charge_map HTTP/1.1
+Content-Type: application/json
+Accept: application/json
+
+{
+  "question": "南京江宁哪些地方有电车充电桩"
+}
+
+###
+POST http://localhost:8000/sale_predict_month HTTP/1.1
+Content-Type: application/json
+Accept: application/json
+
+{
+  "question": "预测一下明年3月份的新能源汽车销量"
+}
