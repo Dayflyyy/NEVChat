@@ -1,14 +1,20 @@
-from fastapi import FastAPI
+import datetime
+from datetime import time
+
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from starlette.responses import StreamingResponse
 from zhipuai import ZhipuAI
 import json
 import asyncio
-import message_queue
+from message_queue import MessageQueue
 
 app = FastAPI()
-your_api_key = "3739459af48de127aee901616a603dff.N2KAwjsKTZKKtbfI"
+# your_api_key = "3739459af48de127aee901616a603dff.N2KAwjsKTZKKtbfI"#全部用完qwq
+your_api_key = "ca60728f080f1e1786cf0ba58aab1d44.KbBFT3wCCgXH0Oie"  # xsy
 
+message_queue = MessageQueue("task_queue")
 # 配置 CORS
 app.add_middleware(
     CORSMiddleware,
@@ -18,8 +24,11 @@ app.add_middleware(
     allow_headers=["*"],  # 允许所有头信息
 )
 
+
 class ChatRequest(BaseModel):
     question: str
+
+
 # async def call_zhipu_ai(message):
 #     client = ZhipuAI(api_key=your_api_key)
 #     response = await asyncio.to_thread(client.chat.completions.create(
@@ -42,6 +51,7 @@ class ChatRequest(BaseModel):
 @app.options("/chat")
 async def options_handler():
     return {"status": "ok"}
+
 
 @app.post("/chat")
 async def chatresponse(request: ChatRequest):
@@ -74,9 +84,11 @@ async def chatresponse(request: ChatRequest):
     print(answer)
     return {"message": answer}
 
+
 @app.options("/analysis")
 async def options_handler():
     return {"status": "ok"}
+
 
 @app.post("/analysis")
 async def getusing(request: ChatRequest):
@@ -101,7 +113,13 @@ async def getusing(request: ChatRequest):
             {"role": "user", "content": "新能源汽车目前的发展如何，未来几个月的销量如何"},
             {"role": "assistant", "content": "生成的函数使用列表为:[0,0,0,0,1,0,0,0]"},
             {"role": "user",
-             "content": "对应关系做得很好，但格式不正确，请仅给我返回数组，不需要任何其他任何的文字描述，例如“[1,0,1,0,0,0,0,0]”"},
+             "content": "对应关系做得很好，但格式不正确，请仅给我返回数组，不需要任何其他任何的文字描述，例如“[1,0,1,0,0,0,0,0]”，如果问题与新能源汽车平台无关，请返回“[0,0,0,0,0,0,0,0]”"},
+            {"role": "assistant", "content": "好的我明白了，我会只给您返回数组，请告诉我用户的问题"},
+            {"role": "user", "content": "你是谁"},
+            {"role": "assistant",
+             "content": "这个问题与新能源汽车大数据分析平台的功能无关，因此不会触发任何功能函数的使用。以下是相应的数组：[0,0,0,0,0,0,0,0]"},
+            {"role": "user",
+             "content": "函数使用的判断是正确的，但请仅给我返回数组，不需要任何其他任何的文字描述，如果问题与新能源汽车平台无关，请仅返回“[0,0,0,0,0,0,0,0]”"},
             {"role": "assistant", "content": "好的我明白了，我会只给您返回数组，请告诉我用户的问题"},
             {"role": "user", "content": f"{question}"}
 
@@ -110,6 +128,68 @@ async def getusing(request: ChatRequest):
     print(response.choices[0].message.content)
     arr = json.loads(response.choices[0].message.content)
     return {"using": arr}
+
+
+# async def generate_response(question):
+#     client = ZhipuAI(api_key="your_api_key")  # 填写您自己的APIKey
+#     response = client.chat.completions.create(
+#         model="glm-4-0520",
+#         messages=[
+#             {"role": "user",
+#              "content": "假设你作为一个新能源品牌专家，内嵌于新能源汽车大数据分析平台，请根据用户问题为用户答疑解惑"},
+#             {"role": "assistant", "content": "当然，请告诉我用户的问题"},
+#             {"role": "user", "content": question}
+#         ],
+#         stream=True,
+#     )
+#
+#     # 逐步返回AI响应的流
+#     for chunk in response:
+#         chunk_content = chunk.choices[0].delta.content
+#         if chunk_content:
+#             yield chunk_content
+#         await asyncio.sleep(0.1)  # 模拟延时，以便前端能够处理流式响应
+#
+#
+# @app.post("/commonanswer")
+# async def get_using(request: ChatRequest):
+#     question = request.question
+#     return StreamingResponse(generate_response(question), media_type="text/plain")
+
+@app.post("/commonanswer")
+async def generate_response(request: ChatRequest):
+    question = request.question
+    client = ZhipuAI(api_key=your_api_key)  # 替换为你的API Key
+    response = client.chat.completions.create(
+        model="glm-4-0520",
+        messages=[
+            {"role": "user",
+             "content": "假设你作为一个新能源品牌专家，内嵌于新能源汽车大数据分析平台，请根据用户问题为用户答疑解惑"},
+            {"role": "assistant", "content": "当然，请告诉我用户的问题"},
+            {"role": "user", "content": question}
+        ],
+        stream=True,
+    )
+
+    # 定义一个生成器，用于逐步返回API的流式响应
+    async def stream_data():
+        try:
+            for chunk in response:
+                # 将每个流块逐步发送给前端
+                print(chunk.choices[0].delta.content)
+                yield f"data: {json.dumps({'number': chunk.choices[0].delta.content})}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+        yield f"data: {json.dumps({'number': 'done'})}\n\n"  # 完成后发送 done 结束流
+
+    headers = {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+    }
+
+    return StreamingResponse(stream_data(), headers=headers)
+
 
 @app.post("/brand_card")
 async def brand_card(request: ChatRequest):
@@ -143,9 +223,20 @@ async def brand_card(request: ChatRequest):
                                                )
     brand = str(responseforbrand.choices[0].message.content)
     print(brand)
-    return {"content": answer,
-            "brand": brand
-            }
+    # 给springboot发送消息
+    request_id = message_queue.send_message(api_type="getBrand", parameters={"brand": brand})
+
+    try:
+        spring_brand_info = await message_queue.wait_for_response(request_id)
+    except TimeoutError as e:
+        raise HTTPException(status_code=504, detail=str(e))
+
+    # 返回整合后的结果
+    return {
+        "content": answer,
+        "brand": brand,
+        "brandinfo": spring_brand_info
+    }
 
 
 @app.post("/brand_card_list")
@@ -182,11 +273,122 @@ async def brand_card_list(request: ChatRequest):
     brandlist = str(responseforbrandlist.choices[0].message.content)
     brandlist = json.loads(brandlist)
     print(brandlist)
-    return {"content": answer,
-            "brandlist": brandlist
-            }
+    # 给spring发送消息
+    request_id = message_queue.send_message(api_type="getBrandList", parameters={"brandlist": brandlist})
+
+    try:
+        spring_brand_info_list = await message_queue.wait_for_response(request_id)
+    except TimeoutError as e:
+        raise HTTPException(status_code=504, detail=str(e))
+
+    # 返回整合后的结果
+    return {
+        "content": answer,
+        "brandlist": brandlist,
+        "brandinfolist": spring_brand_info_list
+    }
 
 
+@app.post("/type_card")
+async def brand_card(request: ChatRequest):
+    client = ZhipuAI(api_key=your_api_key)  # 使用环境变量或者配置文件代替明文APIKey
+    response = await asyncio.to_thread(client.chat.completions.create,
+                                       model="glm-4-0520",  # 填写需要调用的模型编码
+                                       messages=[
+                                           {"role": "user",
+                                            "content": "假设你作为一个新能源汽车车型专家，请回答用户的问题，请把回答控制在较短的篇幅内"},
+                                           {"role": "assistant",
+                                            "content": "好的，请告诉我用户的问题"},
+                                           {"role": "user",
+                                            "content": f"用户问题是：{request.question},请从车型性能，车型销量，车型优劣势等方面进行用户所需车型的分析。"},
+                                       ],
+                                       )
+    answer = str(response.choices[0].message.content)
+    print(answer)
+    responseforbrand = await asyncio.to_thread(client.chat.completions.create,
+                                               model="glm-4-0520",  # 填写需要调用的模型编码
+                                               messages=[
+                                                   {"role": "user",
+                                                    "content": '''请根据我给你的文字段，提取出TypeCard函数的参数{type:str},我需要这个参数向后端请求相应的车型信息，
+                                                    你可以参考下面的示例：
+                                                    文字段：Model Y是特斯拉推出的电动跨界SUV，具有出色的动力性能和续航能力。该车型在市场上销量不断增长，受到消费者青睐。优势包括零排放、先进的技术和宽敞的内部空间，但价格较高、充电基础设施尚需改善、维修成本较高是其劣势。消费者在选择Model Y时需综合考虑这些因素。
+                                                    返回值：Model Y
+                                                    你需要提取出车型名称，并只给我车型名这个字符串'''},
+                                                   {"role": "assistant",
+                                                    "content": "好的，请给我您需要分析的文字段"},
+                                                   {"role": "user",
+                                                    "content": f'{answer}'},
+                                               ],
+                                               )
+    type = str(responseforbrand.choices[0].message.content)
+    print(type)
+    # 给springboot发送消息
+    request_id = message_queue.send_message(api_type="getType", parameters={"type": type})
+
+    try:
+        spring_type_info = await message_queue.wait_for_response(request_id)
+    except TimeoutError as e:
+        raise HTTPException(status_code=504, detail=str(e))
+
+    # 返回整合后的结果
+    return {
+        "content": answer,
+        "type": type,
+        "typeinfo": spring_type_info
+    }
+
+
+@app.post("/type_card_list")
+async def brand_card_list(request: ChatRequest):
+    client = ZhipuAI(api_key=your_api_key)  # 使用环境变量或者配置文件代替明文APIKey
+    response = await asyncio.to_thread(client.chat.completions.create,
+                                       model="glm-4-0520",  # 填写需要调用的模型编码
+                                       messages=[
+                                           {"role": "user",
+                                            "content": "假设你作为一个新能源汽车车型专家，请回答我的问题，请把回答控制在较短的篇幅内"},
+                                           {"role": "assistant",
+                                            "content": "好的，请告诉我问题"},
+                                           {"role": "user",
+                                            "content": f"我的问题是：{request.question},请从车型性能，车型销量，车型优劣势等方面进行我需要的车型的分析,请把品牌名返回为中文，例如“比亚迪唐”，“特斯拉Model Y”"},
+                                       ],
+                                       )
+    answer = str(response.choices[0].message.content)
+    print(answer)
+    responseforbrandlist = await asyncio.to_thread(client.chat.completions.create,
+                                                   model="glm-4-0520",  # 填写需要调用的模型编码
+                                                   messages=[
+                                                       {"role": "user",
+                                                        "content": '''请根据我给你的文字段，提取TypeCardlist函数的参数typelist:[],我需要这个参数向后端请求相应的车型信息，
+                                                        你可以参考下面的示例：
+                                                        文字段：这些销量较高的新能源车型，如特斯拉Model 3、日产Leaf、雪佛兰Bolt EV、比亚迪唐以及零跑汽车，代表着新能源汽车市场的一部分翘楚。特斯拉Model 3以其出色的续航表现和高性能在全球范围内备受追捧，而日产Leaf作为早期推出的电动车型则以可靠的续航里程和实用性受到消费者认可。雪佛兰Bolt EV在动力性能和实用性上表现优异，BYD唐则以其插电式混合动力系统在中国市场取得成功，而零跑汽车则在中国市场崭露头角。这些车型的成功反映了消费者对续航能力、性能和科技创新的追求，为新能源汽车行业的发展树立了榜样。
+                                                        返回值：["特斯拉Model 3","日产Leaf","雪佛兰Bolt EV","比亚迪唐","零跑汽车"]
+                                                        你需要提取出车型名称列表，并以数组样式返回，回答中仅包含该数组'''},
+                                                       {"role": "assistant",
+                                                        "content": "好的，请给我您需要分析的文字段"},
+                                                       {"role": "user",
+                                                        "content": f'{answer}'},
+                                                   ],
+                                                   )
+    typelist = str(responseforbrandlist.choices[0].message.content)
+    typelist = json.loads(typelist)
+    print(typelist)
+    # 给spring发送消息
+    request_id = message_queue.send_message(api_type="getTypeList", parameters={"typelist": typelist})
+
+    try:
+        spring_type_info_list = await message_queue.wait_for_response(request_id)
+    except TimeoutError as e:
+        raise HTTPException(status_code=504, detail=str(e))
+
+    # 返回整合后的结果
+    return {
+        "content": answer,
+        "typelist": typelist,
+        "typeinfolist": spring_type_info_list
+    }
+
+
+# 直接返回给前端前端发请求给map api
 @app.post("/charge_map")
 async def charge_map(request: ChatRequest):
     client = ZhipuAI(api_key=your_api_key)  # 使用环境变量或者配置文件代替明文APIKey
@@ -194,11 +396,11 @@ async def charge_map(request: ChatRequest):
                                        model="glm-4-0520",  # 填写需要调用的模型编码
                                        messages=[
                                            {"role": "user",
-                                            "content": "假设你作为一个充电服务专家，请回答我的问题，请把回答控制在较短的篇幅内"},
+                                            "content": "假设你作为一个新能源汽车充电桩服务专家，请回答我的问题，请把回答控制在较短的篇幅内"},
                                            {"role": "assistant",
                                             "content": "当然，请告诉我用户的问题"},
                                            {"role": "user",
-                                            "content": f"用户问题是：{request.question}，请根据用户对新能源充电桩的相关需求进行详细的分析。"},
+                                            "content": f"用户问题是：{request.question}，请根据用户对新能源充电桩的相关需求进行分析并回答用户。"},
                                        ],
                                        )
     answer = str(response.choices[0].message.content)
@@ -259,9 +461,20 @@ async def sale_predict_month(request: ChatRequest):
                                                )
     month = str(responseformonth.choices[0].message.content)
     print(month)
-    return {"content": answer,
-            "month": month
-            }
+    # 给spring发送消息
+    request_id = message_queue.send_message(api_type="getPerdictMonth", parameters={"month": month})
+
+    try:
+        spring_predict_month = await message_queue.wait_for_response(request_id)
+    except TimeoutError as e:
+        raise HTTPException(status_code=504, detail=str(e))
+
+    # 返回整合后的结果
+    return {
+        "content": answer,
+        "month": month,
+        "predictmonth": spring_predict_month
+    }
 
 
 @app.post("/sale_predict_year")
@@ -280,6 +493,7 @@ async def sale_predict_year(request: ChatRequest):
                                        )
     answer = str(response.choices[0].message.content)
     print(answer)
+
     return {"content": answer}
 
 
@@ -299,7 +513,24 @@ async def news_list(request: ChatRequest):
                                        )
     answer = str(response.choices[0].message.content)
     print(answer)
-    return {"content": answer}
+
+    # 获取系统当前时间
+    time = datetime.datetime.now()
+    # 格式化时间，只保留年月日
+    time = time.strftime("%Y-%m-%d")
+
+    request_id = message_queue.send_message(api_type="getNewsList", parameters={"date": time})
+
+    try:
+        spring_news_list = await message_queue.wait_for_response(request_id)
+    except TimeoutError as e:
+        raise HTTPException(status_code=504, detail=str(e))
+
+    # 返回整合后的结果
+    return {
+        "content": answer,
+        "newslist": spring_news_list
+    }
 
 # @app.post("/sales")
 # async def saleana():

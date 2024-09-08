@@ -1,15 +1,47 @@
 # Test your FastAPI endpoints
 
-### 测试call_zhipu
-POST http://localhost:8000/test
+#POST http://localhost:8000/test
+#Content-Type: application/json
+#Accept: application/json
+#
+#{
+#  "question": "介绍一下特斯拉这个品牌"
+#}
+
+
+### 测试ai analysis模块
+
+POST http://localhost:8000/analysis
 Content-Type: application/json
 Accept: application/json
 
 {
-  "question": "介绍一下特斯拉这个品牌"
+  "question": "给我一些新能源汽车领域的投资建议"
 }
+### 测试ai analysis模块
+POST http://localhost:8000/analysis
+Content-Type: application/json
+Accept: application/json
 
+{
+  "question": "新能源汽车目前的发展前景如何，有哪些方向我可以投资"
+}
+### 测试ai analysis模块
+POST http://localhost:8000/analysis
+Content-Type: application/json
+Accept: application/json
 
+{
+  "question": "你是谁"
+}
+### 测试ai analysis模块
+POST http://localhost:8000/analysis
+Content-Type: application/json
+Accept: application/json
+
+{
+  "question": "新能源汽车有哪些技术难点"
+}
 ### 测试brand
 
 POST http://localhost:8000/brand_card
@@ -17,10 +49,10 @@ Content-Type: application/json
 Accept: application/json
 
 {
-  "question": "介绍一下特斯拉这个品牌"
+  "question": "介绍一下奔驰这个品牌"
 }
 
-###
+### 测试brandlist
 
 POST http://localhost:8000/brand_card_list
 Content-Type: application/json
@@ -30,7 +62,7 @@ Accept: application/json
   "question": "给我推荐一些适合投资的新能源车企"
 }
 
-###
+### 测试chargemap
 
 POST http://localhost:8000/charge_map HTTP/1.1
 Content-Type: application/json
@@ -40,7 +72,17 @@ Accept: application/json
   "question": "南京江宁哪些地方有电车充电桩"
 }
 
-###
+### 测试salespredictyear
+POST http://localhost:8000/sale_predict_year HTTP/1.1
+Content-Type: application/json
+Accept: application/json
+
+{
+  "question": "给我一些新能源汽车领域的投资建议"
+}
+
+### 测试salepredictmonth
+
 POST http://localhost:8000/sale_predict_month HTTP/1.1
 Content-Type: application/json
 Accept: application/json
@@ -48,3 +90,35 @@ Accept: application/json
 {
   "question": "预测一下明年3月份的新能源汽车销量"
 }
+
+### 测试type
+
+POST http://localhost:8000/type_card
+Content-Type: application/json
+Accept: application/json
+
+{
+  "question": "给我推荐一款适合购买的新能源车"
+}
+
+### 测试typelist
+
+POST http://localhost:8000/type_card_list
+Content-Type: application/json
+Accept: application/json
+
+{
+  "question": "介绍目前销量比较高的新能源车型"
+}
+
+### 测试newlist
+
+POST http://localhost:8000/news_list
+Content-Type: application/json
+Accept: application/json
+
+{
+  "question": "介绍这两天新能源汽车领域的最新资讯"
+}
+
+
